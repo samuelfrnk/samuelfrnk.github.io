@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithm Visualizer — Samuel Frank</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #0f1318;
+    --bg3: #151a21;
+    --panel: #1a2030;
+    --border: #1e2a3a;
+    --border2: #253040;
+    --text: #c8d8e8;
+    --muted: #4a6080;
+    --accent: #00d4ff;
+    --accent2: #00ff88;
+    --accent3: #ff6b35;
+    --warn: #f5a623;
+    --red: #ff4d6d;
+    --green: #00c86a;
+    --blue: #3b8bd4;
+    --yellow: #f5e642;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-ui: 'Space Grotesk', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(10,12,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-logo {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  .nav-logo span { color: var(--muted); }
+
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--accent); }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 2rem 4rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 80px;
+    background: linear-gradient(to bottom, var(--border2), transparent);
+  }
+
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 40%, transparent 100%);
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2rem, 6vw, 4.5rem);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #e8f4ff;
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero-sub {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 500px;
+    line-height: 1.8;
+    margin-bottom: 3rem;
+  }
+
+  .hero-cards {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+  }
+
+  .hero-card {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hero-card:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,212,255,0.04);
+  }
+
+  .hero-card .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .hero-card.green .dot { background: var(--accent2); }
+  .hero-card.green:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(0,255,136,0.04); }
+
+  /* SECTIONS */
+  section {
+    padding: 5rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-weight: 400;
+    color: #e8f4ff;
+    letter-spacing: -0.01em;
+  }
+
+  h2 em { font-style: normal; color: var(--accent); }
+  h2 .g { color: var(--accent2); }
+
+  .section-desc {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0.5rem 0 2rem;
+    line-height: 1.8;
+    max-width: 600px;
+  }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin: 0 0 2rem;
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+  }
+
+  button {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--border2);
+    background: var(--panel);
+    color: var(--muted);
+  }
+
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+  button.primary:hover { background: rgba(0,212,255,0.14); }
+  button.danger { border-color: var(--red); color: var(--red); }
+  button.danger:hover { background: rgba(255,77,109,0.08); }
+  button.success { border-color: var(--accent2); color: var(--accent2); background: rgba(0,255,136,0.06); }
+  button.success:hover { background: rgba(0,255,136,0.14); }
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  select {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+    outline: none;
+  }
+
+  select:focus { border-color: var(--accent); color: var(--accent); }
+
+  .status-bar {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0.4rem 0.75rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 220px;
+  }
+
+  .status-bar span { color: var(--accent); }
+  .status-bar.green span { color: var(--accent2); }
+  .status-bar.warn span { color: var(--warn); }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+  }
+
+  /* MAZE CANVAS */
+  #maze-canvas {
+    display: block;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    background: var(--bg2);
+    cursor: crosshair;
+    max-width: 100%;
+    touch-action: none;
+  }
+
+  .canvas-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* CONNECT FOUR */
+  .c4-layout {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  @media (max-width: 700px) {
+    .c4-layout { grid-template-columns: 1fr; }
+  }
+
+  #c4-board {
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    background: var(--bg2);
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    width: fit-content;
+  }
+
+  .c4-cell {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.12s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .c4-cell::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: transparent;
+    transition: background 0.12s;
+  }
+
+  .c4-cell.hover::after { background: rgba(0,212,255,0.08); }
+  .c4-cell.p1::after { background: var(--accent3); box-shadow: 0 0 10px rgba(255,107,53,0.4); }
+  .c4-cell.p2::after { background: var(--yellow); box-shadow: 0 0 10px rgba(245,230,66,0.4); }
+  .c4-cell.win::after { animation: pulse-win 0.6s ease infinite alternate; }
+
+  @keyframes pulse-win {
+    from { opacity: 0.7; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1.0); }
+  }
+
+  @media (max-width: 500px) {
+    .c4-cell { width: 40px; height: 40px; }
+    #c4-board { gap: 4px; padding: 8px; }
+  }
+
+  .c4-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .info-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+  }
+
+  .info-card h3 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-card p {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .info-card .highlight { color: var(--accent); }
+  .info-card .highlight2 { color: var(--accent2); }
+  .info-card .highlight3 { color: var(--accent3); }
+  .info-card .highlightY { color: var(--yellow); }
+
+  .stat-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .stat-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .stat-pill.blue { border-color: var(--accent); color: var(--accent); }
+  .stat-pill.green { border-color: var(--accent2); color: var(--accent2); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* CURSOR BLINK */
+  .blink::after {
+    content: '█';
+    animation: blink 1s step-end infinite;
+    color: var(--accent);
+    font-size: 0.8em;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* PHASE LABEL */
+  .phase-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    border: 1px solid;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .phase-start { border-color: var(--accent2); color: var(--accent2); }
+  .phase-end { border-color: var(--red); color: var(--red); }
+  .phase-wall { border-color: var(--muted); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo"><span>~/</span>algorithms<span>.viz</span></div>
+  <ul class="nav-links">
+    <li><a href="#dijkstra">Dijkstra</a></li>
+    <li><a href="#connect4">Connect 4</a></li>
+    <li><a href="https://github.com" target="_blank">GitHub</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <div class="grid-bg"></div>
+  <p class="tag">// algorithm visualizer</p>
+  <h1>Pathfinding &amp;<br><em>Game Theory</em></h1>
+  <p class="hero-sub">Interactive visualizations of classical algorithms.<br>Click the maze to set start &amp; end. Play against a minimax AI.</p>
+  <div class="hero-cards">
+    <a class="hero-card" href="#dijkstra"><span class="dot"></span>Dijkstra's shortest path</a>
+    <a class="hero-card green" href="#connect4"><span class="dot"></span>Minimax + alpha-beta</a>
+  </div>
+</div>
+
+<!-- ===== DIJKSTRA ===== -->
+<section id="dijkstra">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2>Dijkstra's <em>Shortest Path</em></h2>
+  </div>
+  <p class="section-desc">
+    Click to place start (green) → end (red) → walls. Then run. The algorithm explores weighted cells and finds the optimal route.
+  </p>
+  <div class="divider"></div>
+
+  <div class="controls">
+    <select id="maze-mode">
+      <option value="start">Place start</option>
+      <option value="end">Place end</option>
+      <option value="wall">Draw walls</option>
+      <option value="erase">Erase</option>
+    </select>
+    <button class="primary" id="run-btn" onclick="runDijkstra()">▶ Run</button>
+    <button onclick="generateMaze()">⚙ Generate maze</button>
+    <button class="danger" onclick="clearMaze()">✕ Clear</button>
+    <div class="status-bar" id="maze-status"><span>Ready</span> — click to place start/end</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#00c86a"></div> Start</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ff4d6d"></div> End</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#253040"></div> Wall</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,212,255,0.25)"></div> Explored</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f5a623"></div> Path</div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="maze-canvas"></canvas>
+  </div>
+</section>
+
+<!-- ===== CONNECT 4 ===== -->
+<section id="connect4">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2>Connect Four — <span class="g">Minimax</span></h2>
+  </div>
+  <p class="section-desc">
+    Classic 4 Gewinnt. You play against an AI using minimax search with alpha-beta pruning. Adjust difficulty below.
+  </p>
+  <div class="divider"></div>
+
+  <div class="controls">
+    <select id="ai-depth">
+      <option value="2">Easy (depth 2)</option>
+      <option value="4" selected>Medium (depth 4)</option>
+      <option value="7">Hard (depth 7)</option>
+    </select>
+    <button class="success" onclick="resetC4()">⟳ New game</button>
+    <div class="status-bar green" id="c4-status"><span>Your turn</span> — click a column</div>
+  </div>
+
+  <div class="c4-layout">
+    <div>
+      <div id="c4-board"></div>
+    </div>
+    <div class="c4-info">
+      <div class="info-card">
+        <h3>Turn</h3>
+        <p id="turn-info">You are <span class="highlight3">■ Orange</span></p>
+        <p id="ai-info" style="margin-top:0.4rem; color: var(--muted); font-size:11px;">AI is <span class="highlightY">■ Yellow</span></p>
+      </div>
+      <div class="info-card">
+        <h3>Algorithm</h3>
+        <p>Minimax with <span class="highlight">alpha-beta pruning</span></p>
+        <div class="stat-row">
+          <div class="stat-pill blue" id="nodes-label">Nodes: 0</div>
+          <div class="stat-pill green" id="pruned-label">Pruned: 0</div>
+        </div>
+      </div>
+      <div class="info-card">
+        <h3>Score</h3>
+        <p>You: <span class="highlight3" id="score-p1">0</span> &nbsp;|&nbsp; AI: <span class="highlightY" id="score-p2">0</span> &nbsp;|&nbsp; Draws: <span class="highlight" id="score-draw">0</span></p>
+      </div>
+      <div class="info-card">
+        <h3>How it works</h3>
+        <p style="font-size:11px; line-height:1.8; color:var(--muted)">
+          Alpha-beta pruning skips branches that can't improve the best known move.
+          At depth 7, it evaluates <span class="highlight">millions</span> of positions per move
+          while pruning <span class="highlight2">60-90%</span> of the tree.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>samuelfrank.ch &nbsp;·&nbsp; Hosted on <a href="https://pages.github.com" target="_blank">GitHub Pages</a></p>
+</footer>
+
+<script>
+/* =============================================
+   MAZE / DIJKSTRA
+   ============================================= */
+const canvas = document.getElementById('maze-canvas');
+const ctx = canvas.getContext('2d');
+
+const COLS = 35, ROWS = 20, CELL = 24;
+canvas.width  = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+let grid = [], startCell = null, endCell = null;
+let running = false, mouseDown = false, lastMode = null;
+
+function initGrid() {
+  grid = [];
+  for (let r = 0; r < ROWS; r++) {
+    grid[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      grid[r][c] = { wall: false, visited: false, dist: Infinity, prev: null, path: false };
+    }
+  }
+  startCell = null; endCell = null;
+}
+
+function cellColor(r, c) {
+  const cell = grid[r][c];
+  if (startCell && startCell[0] === r && startCell[1] === c) return '#00c86a';
+  if (endCell   && endCell[0]   === r && endCell[1]   === c) return '#ff4d6d';
+  if (cell.wall)    return '#1a2535';
+  if (cell.path)    return '#f5a623';
+  if (cell.visited) return `rgba(0,212,255,${0.1 + 0.25 * Math.min(1, 100 / (cell.dist + 1))})`;
+  return '#0f1318';
+}
+
+function drawMaze() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      ctx.fillStyle = cellColor(r, c);
+      ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2);
+    }
+  }
+  // grid lines
+  ctx.strokeStyle = '#1a2535';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*CELL); ctx.lineTo(canvas.width, r*CELL); ctx.stroke(); }
+  for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c*CELL, 0); ctx.lineTo(c*CELL, canvas.height); ctx.stroke(); }
+}
+
+function getCell(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top)  * scaleY;
+  const c = Math.floor(x / CELL);
+  const r = Math.floor(y / CELL);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+  return [r, c];
+}
+
+function handleClick(e) {
+  if (running) return;
+  const cell = getCell(e);
+  if (!cell) return;
+  const [r, c] = cell;
+  const mode = document.getElementById('maze-mode').value;
+
+  // Reset visited/path state
+  for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) {
+    grid[i][j].visited = false; grid[i][j].dist = Infinity; grid[i][j].prev = null; grid[i][j].path = false;
+  }
+
+  if (mode === 'start') {
+    startCell = [r, c];
+    grid[r][c].wall = false;
+  } else if (mode === 'end') {
+    endCell = [r, c];
+    grid[r][c].wall = false;
+  } else if (mode === 'wall') {
+    if (!(startCell && startCell[0]===r && startCell[1]===c) &&
+        !(endCell   && endCell[0]  ===r && endCell[1]  ===c)) {
+      grid[r][c].wall = true;
+    }
+  } else if (mode === 'erase') {
+    grid[r][c].wall = false;
+  }
+  setStatus('maze', 'ready');
+  drawMaze();
+}
+
+function handleDrag(e) {
+  if (!mouseDown) return;
+  const mode = document.getElementById('maze-mode').value;
+  if (mode !== 'wall' && mode !== 'erase') return;
+  const cell = getCell(e);
+  if (!cell) return;
+  const [r, c] = cell;
+  if (!(startCell && startCell[0]===r && startCell[1]===c) &&
+      !(endCell   && endCell[0]  ===r && endCell[1]  ===c)) {
+    grid[r][c].wall = (mode === 'wall');
+    drawMaze();
+  }
+}
+
+canvas.addEventListener('mousedown',  e => { mouseDown = true; handleClick(e); });
+canvas.addEventListener('mouseup',    () => mouseDown = false);
+canvas.addEventListener('mousemove',  e => handleDrag(e));
+canvas.addEventListener('mouseleave', () => mouseDown = false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); mouseDown = true; handleClick(e.touches[0]); }, { passive: false });
+canvas.addEventListener('touchend',   () => mouseDown = false);
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); handleDrag(e.touches[0]); }, { passive: false });
+
+function setStatus(which, state, extra) {
+  const el = document.getElementById(which === 'maze' ? 'maze-status' : 'c4-status');
+  if (which === 'maze') {
+    const msgs = {
+      ready:    '<span>Ready</span> — click to place start/end',
+      running:  '<span>Running</span> Dijkstra…',
+      found:    '<span>Found!</span> ' + (extra || ''),
+      nopath:   '<span>No path</span> — wall blocks route',
+      nostart:  '<span>Set start</span> and end first',
+    };
+    el.innerHTML = msgs[state] || msgs.ready;
+    el.className = 'status-bar';
+    if (state === 'found') el.className += ' green';
+    if (state === 'nopath' || state === 'nostart') el.className += ' warn';
+  }
+}
+
+async function runDijkstra() {
+  if (running) return;
+  if (!startCell || !endCell) { setStatus('maze', 'nostart'); return; }
+
+  running = true;
+  document.getElementById('run-btn').disabled = true;
+
+  // Reset
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    grid[r][c].visited = false; grid[r][c].dist = Infinity; grid[r][c].prev = null; grid[r][c].path = false;
+  }
+  const [sr, sc] = startCell;
+  grid[sr][sc].dist = 0;
+
+  setStatus('maze', 'running');
+
+  // Min-heap via sorted array (small grid, ok)
+  const pq = [[0, sr, sc]];
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  let found = false;
+
+  while (pq.length > 0) {
+    pq.sort((a,b) => a[0]-b[0]);
+    const [dist, r, c] = pq.shift();
+    if (grid[r][c].visited) continue;
+    grid[r][c].visited = true;
+
+    if (endCell && endCell[0]===r && endCell[1]===c) { found = true; break; }
+
+    for (const [dr, dc] of dirs) {
+      const nr = r+dr, nc = c+dc;
+      if (nr<0||nr>=ROWS||nc<0||nc>=COLS||grid[nr][nc].wall||grid[nr][nc].visited) continue;
+      const nd = dist + 1;
+      if (nd < grid[nr][nc].dist) {
+        grid[nr][nc].dist = nd;
+        grid[nr][nc].prev = [r, c];
+        pq.push([nd, nr, nc]);
+      }
+    }
+
+    drawMaze();
+    await new Promise(res => setTimeout(res, 12));
+  }
+
+  if (found) {
+    // Trace path
+    let cur = endCell;
+    let len = 0;
+    while (cur) {
+      grid[cur[0]][cur[1]].path = true;
+      cur = grid[cur[0]][cur[1]].prev;
+      len++;
+      drawMaze();
+      await new Promise(res => setTimeout(res, 20));
+    }
+    setStatus('maze', 'found', `Path length: ${len-1} cells`);
+  } else {
+    setStatus('maze', 'nopath');
+  }
+
+  running = false;
+  document.getElementById('run-btn').disabled = false;
+}
+
+function clearMaze() {
+  if (running) return;
+  initGrid();
+  setStatus('maze', 'ready');
+  drawMaze();
+}
+
+function generateMaze() {
+  if (running) return;
+  initGrid();
+
+  // Recursive backtracker (on 2x scale)
+  const mr = Math.floor(ROWS/2), mc = Math.floor(COLS/2);
+  // First fill with walls
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c].wall = true;
+
+  const stack = [[0, 0]];
+  const visited2 = Array.from({length: mr}, () => new Array(mc).fill(false));
+  visited2[0][0] = true;
+  grid[0][0].wall = false;
+
+  const dirs2 = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  function shuffle(arr) {
+    for (let i = arr.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]] = [arr[j],arr[i]];
+    }
+    return arr;
+  }
+
+  while (stack.length > 0) {
+    const [cr, cc] = stack[stack.length-1];
+    const shuffled = shuffle([...dirs2]);
+    let moved = false;
+    for (const [dr, dc] of shuffled) {
+      const nr = cr+dr, nc = cc+dc;
+      if (nr<0||nr>=mr||nc<0||nc>=mc||visited2[nr][nc]) continue;
+      visited2[nr][nc] = true;
+      // carve passage
+      const wallR = cr*2+dr, wallC = cc*2+dc;
+      if (wallR>=0&&wallR<ROWS&&wallC>=0&&wallC<COLS) grid[wallR][wallC].wall = false;
+      const cellR = cr*2+dr*2, cellC = cc*2+dc*2;
+      if (cellR>=0&&cellR<ROWS&&cellC>=0&&cellC<COLS) grid[cellR][cellC].wall = false;
+      stack.push([nr, nc]);
+      moved = true;
+      break;
+    }
+    if (!moved) stack.pop();
+  }
+
+  // Open border passages
+  for (let r = 0; r < ROWS; r+=2) grid[r][0].wall = false;
+  for (let c = 0; c < COLS; c+=2) grid[0][c].wall = false;
+
+  startCell = [1, 1];
+  endCell   = [ROWS-2, COLS-2];
+  grid[startCell[0]][startCell[1]].wall = false;
+  grid[endCell[0]][endCell[1]].wall = false;
+  setStatus('maze', 'ready');
+  drawMaze();
+}
+
+/* =============================================
+   CONNECT FOUR — MINIMAX + ALPHA-BETA
+   ============================================= */
+const C4_ROWS = 6, C4_COLS = 7;
+let c4Board, c4Turn, c4GameOver, c4AIThinking;
+let scoreP1 = 0, scoreP2 = 0, scoreDraw = 0;
+let totalNodes = 0, totalPruned = 0;
+
+function resetC4() {
+  c4Board = Array.from({length: C4_ROWS}, () => new Array(C4_COLS).fill(0));
+  c4Turn = 1; c4GameOver = false; c4AIThinking = false;
+  totalNodes = 0; totalPruned = 0;
+  updateC4Status();
+  renderC4();
+}
+
+function renderC4() {
+  const board = document.getElementById('c4-board');
+  board.innerHTML = '';
+  for (let r = 0; r < C4_ROWS; r++) {
+    for (let c = 0; c < C4_COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'c4-cell';
+      const v = c4Board[r][c];
+      if (v === 1) cell.classList.add('p1');
+      if (v === 2) cell.classList.add('p2');
+      cell.dataset.col = c;
+      cell.addEventListener('click', () => humanMove(c));
+      cell.addEventListener('mouseenter', () => {
+        if (!c4GameOver && !c4AIThinking && c4Turn === 1)
+          document.querySelectorAll(`.c4-cell[data-col="${c}"]`).forEach(x => x.classList.add('hover'));
+      });
+      cell.addEventListener('mouseleave', () =>
+        document.querySelectorAll('.c4-cell').forEach(x => x.classList.remove('hover'))
+      );
+      board.appendChild(cell);
+    }
+  }
+}
+
+function dropPiece(board, col, player) {
+  for (let r = C4_ROWS-1; r >= 0; r--) {
+    if (board[r][col] === 0) { board[r][col] = player; return r; }
+  }
+  return -1;
+}
+
+function isValidCol(board, col) {
+  return board[0][col] === 0;
+}
+
+function checkWin(board, player) {
+  // Horizontal
+  for (let r = 0; r < C4_ROWS; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      if ([0,1,2,3].every(i => board[r][c+i] === player)) return [[r,c],[r,c+1],[r,c+2],[r,c+3]];
+  // Vertical
+  for (let r = 0; r <= C4_ROWS-4; r++)
+    for (let c = 0; c < C4_COLS; c++)
+      if ([0,1,2,3].every(i => board[r+i][c] === player)) return [[r,c],[r+1,c],[r+2,c],[r+3,c]];
+  // Diagonal /
+  for (let r = 3; r < C4_ROWS; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      if ([0,1,2,3].every(i => board[r-i][c+i] === player)) return [[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]];
+  // Diagonal \
+  for (let r = 0; r <= C4_ROWS-4; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      if ([0,1,2,3].every(i => board[r+i][c+i] === player)) return [[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]];
+  return null;
+}
+
+function isBoardFull(board) {
+  return board[0].every(v => v !== 0);
+}
+
+// Heuristic: score a window of 4
+function scoreWindow(window, player) {
+  const opp = player === 2 ? 1 : 2;
+  const mine = window.filter(v => v === player).length;
+  const empty = window.filter(v => v === 0).length;
+  const oppCount = window.filter(v => v === opp).length;
+  if (mine === 4) return 100;
+  if (mine === 3 && empty === 1) return 5;
+  if (mine === 2 && empty === 2) return 2;
+  if (oppCount === 3 && empty === 1) return -4;
+  return 0;
+}
+
+function heuristic(board, player) {
+  let score = 0;
+  // Centre column preference
+  const centre = board.map(r => r[3]).filter(v => v === player).length;
+  score += centre * 3;
+  // Horizontal
+  for (let r = 0; r < C4_ROWS; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      score += scoreWindow([board[r][c],board[r][c+1],board[r][c+2],board[r][c+3]], player);
+  // Vertical
+  for (let r = 0; r <= C4_ROWS-4; r++)
+    for (let c = 0; c < C4_COLS; c++)
+      score += scoreWindow([board[r][c],board[r+1][c],board[r+2][c],board[r+3][c]], player);
+  // Diagonal
+  for (let r = 3; r < C4_ROWS; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      score += scoreWindow([board[r][c],board[r-1][c+1],board[r-2][c+2],board[r-3][c+3]], player);
+  for (let r = 0; r <= C4_ROWS-4; r++)
+    for (let c = 0; c <= C4_COLS-4; c++)
+      score += scoreWindow([board[r][c],board[r+1][c+1],board[r+2][c+2],board[r+3][c+3]], player);
+  return score;
+}
+
+function minimax(board, depth, alpha, beta, maximizing) {
+  totalNodes++;
+  const win2 = checkWin(board, 2);
+  const win1 = checkWin(board, 1);
+  if (win2) return { score: 100000 + depth };
+  if (win1) return { score: -(100000 + depth) };
+  if (isBoardFull(board) || depth === 0) return { score: heuristic(board, 2) };
+
+  const cols = [3,2,4,1,5,0,6].filter(c => isValidCol(board, c));
+
+  if (maximizing) {
+    let best = { score: -Infinity, col: cols[0] };
+    for (const col of cols) {
+      const newBoard = board.map(r => [...r]);
+      dropPiece(newBoard, col, 2);
+      const result = minimax(newBoard, depth-1, alpha, beta, false);
+      if (result.score > best.score) { best = { score: result.score, col }; }
+      alpha = Math.max(alpha, best.score);
+      if (alpha >= beta) { totalPruned++; break; }
+    }
+    return best;
+  } else {
+    let best = { score: Infinity, col: cols[0] };
+    for (const col of cols) {
+      const newBoard = board.map(r => [...r]);
+      dropPiece(newBoard, col, 1);
+      const result = minimax(newBoard, depth-1, alpha, beta, true);
+      if (result.score < best.score) { best = { score: result.score, col }; }
+      beta = Math.min(beta, best.score);
+      if (alpha >= beta) { totalPruned++; break; }
+    }
+    return best;
+  }
+}
+
+async function humanMove(col) {
+  if (c4GameOver || c4AIThinking || c4Turn !== 1) return;
+  if (!isValidCol(c4Board, col)) return;
+
+  dropPiece(c4Board, col, 1);
+  const win = checkWin(c4Board, 1);
+  renderC4();
+
+  if (win) { endGame(1, win); return; }
+  if (isBoardFull(c4Board)) { endGame(0); return; }
+
+  c4Turn = 2; c4AIThinking = true;
+  updateC4Status();
+
+  // Yield to let the render happen
+  await new Promise(res => setTimeout(res, 10));
+  const depth = parseInt(document.getElementById('ai-depth').value);
+  totalNodes = 0; totalPruned = 0;
+  const result = minimax(c4Board, depth, -Infinity, Infinity, true);
+  document.getElementById('nodes-label').textContent  = `Nodes: ${totalNodes.toLocaleString()}`;
+  document.getElementById('pruned-label').textContent = `Pruned: ${totalPruned.toLocaleString()}`;
+
+  dropPiece(c4Board, result.col, 2);
+  const win2 = checkWin(c4Board, 2);
+  c4AIThinking = false;
+  renderC4();
+
+  if (win2) { endGame(2, win2); return; }
+  if (isBoardFull(c4Board)) { endGame(0); return; }
+
+  c4Turn = 1;
+  updateC4Status();
+}
+
+function endGame(winner, winCells) {
+  c4GameOver = true;
+  if (winCells) {
+    // Highlight winning cells
+    setTimeout(() => {
+      const allCells = document.querySelectorAll('.c4-cell');
+      winCells.forEach(([r, c]) => {
+        allCells[r * C4_COLS + c].classList.add('win');
+      });
+    }, 50);
+  }
+  const statusEl = document.getElementById('c4-status');
+  statusEl.className = 'status-bar';
+  if (winner === 1) {
+    scoreP1++;
+    statusEl.innerHTML = '<span style="color:var(--accent3)">You win!</span> 🎉';
+    statusEl.className += ' warn';
+  } else if (winner === 2) {
+    scoreP2++;
+    statusEl.innerHTML = '<span style="color:var(--yellow)">AI wins!</span> GG';
+  } else {
+    scoreDraw++;
+    statusEl.innerHTML = '<span>Draw</span> — well played';
+  }
+  document.getElementById('score-p1').textContent = scoreP1;
+  document.getElementById('score-p2').textContent = scoreP2;
+  document.getElementById('score-draw').textContent = scoreDraw;
+}
+
+function updateC4Status() {
+  if (c4GameOver) return;
+  const el = document.getElementById('c4-status');
+  el.className = 'status-bar green';
+  if (c4AIThinking) {
+    el.innerHTML = '<span>AI thinking…</span> running minimax';
+  } else if (c4Turn === 1) {
+    el.innerHTML = '<span>Your turn</span> — click a column';
+  }
+}
+
+// Init everything
+initGrid();
+drawMaze();
+resetC4();
+</script>
+</body>
+</html>
