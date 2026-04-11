@@ -500,6 +500,43 @@
   .phase-start { border-color: var(--accent2); color: var(--accent2); }
   .phase-end { border-color: var(--red); color: var(--red); }
   .phase-wall { border-color: var(--muted); color: var(--muted); }
+
+  /* GAME TREE */
+  .tree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .tree-header h3 {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  .tree-legend {
+    display: flex;
+    gap: 1rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+
+  .tree-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-height: 100px;
+  }
 </style>
 </head>
 <body>
@@ -603,6 +640,20 @@
         <p>You: <span class="highlight3" id="score-p1">0</span> &nbsp;|&nbsp; AI: <span class="highlightY" id="score-p2">0</span> &nbsp;|&nbsp; Draws: <span class="highlight" id="score-draw">0</span></p>
       </div>
     </div>
+  </div>
+
+  <div class="divider" style="margin-top:2rem;"></div>
+  <div class="tree-header">
+    <h3>Game Tree <span style="color:var(--muted)">— last AI move, 3 levels</span></h3>
+    <div class="tree-legend">
+      <span><span style="color:var(--yellow)">●</span> AI (max)</span>
+      <span><span style="color:var(--accent3)">●</span> Human (min)</span>
+      <span><span style="color:var(--accent)">●</span> best path</span>
+      <span><span style="color:var(--red)">●</span> cutoff</span>
+    </div>
+  </div>
+  <div class="tree-wrap" id="tree-wrap">
+    <div id="tree-svg-container" style="padding:1.5rem; font-family:var(--font-mono); font-size:11px; color:var(--muted);">Make a move to see the game tree.</div>
   </div>
 </section>
 
@@ -875,11 +926,16 @@ const C4_ROWS = 6, C4_COLS = 7;
 let c4Board, c4Turn, c4GameOver, c4AIThinking;
 let scoreP1 = 0, scoreP2 = 0, scoreDraw = 0;
 let totalNodes = 0, totalPruned = 0;
+const TREE_DISPLAY_DEPTH = 3;
+let treeRoot = null;
 
 function resetC4() {
   c4Board = Array.from({length: C4_ROWS}, () => new Array(C4_COLS).fill(0));
   c4Turn = 1; c4GameOver = false; c4AIThinking = false;
   totalNodes = 0; totalPruned = 0;
+  treeRoot = null;
+  document.getElementById('tree-svg-container').innerHTML =
+    '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:1.5rem;display:block">Make a move to see the game tree.</span>';
   updateC4Status();
   renderC4();
 }
@@ -979,13 +1035,23 @@ function heuristic(board, player) {
   return score;
 }
 
-function minimax(board, depth, alpha, beta, maximizing) {
+function minimax(board, depth, alpha, beta, maximizing, captureNode) {
   totalNodes++;
   const win2 = checkWin(board, 2);
   const win1 = checkWin(board, 1);
-  if (win2) return { score: 100000 + depth };
-  if (win1) return { score: -(100000 + depth) };
-  if (isBoardFull(board) || depth === 0) return { score: heuristic(board, 2) };
+  if (win2) {
+    if (captureNode) captureNode.score = 100000 + depth;
+    return { score: 100000 + depth };
+  }
+  if (win1) {
+    if (captureNode) captureNode.score = -(100000 + depth);
+    return { score: -(100000 + depth) };
+  }
+  if (isBoardFull(board) || depth === 0) {
+    const s = heuristic(board, 2);
+    if (captureNode) captureNode.score = s;
+    return { score: s };
+  }
 
   const cols = [3,2,4,1,5,0,6].filter(c => isValidCol(board, c));
 
@@ -994,24 +1060,137 @@ function minimax(board, depth, alpha, beta, maximizing) {
     for (const col of cols) {
       const newBoard = board.map(r => [...r]);
       dropPiece(newBoard, col, 2);
-      const result = minimax(newBoard, depth-1, alpha, beta, false);
+      let childNode = null;
+      if (captureNode && captureNode._td < TREE_DISPLAY_DEPTH) {
+        childNode = { col, score: null, maximizing: false, cutoff: false, children: [], _td: captureNode._td + 1 };
+        captureNode.children.push(childNode);
+      }
+      const result = minimax(newBoard, depth - 1, alpha, beta, false, childNode);
       if (result.score > best.score) { best = { score: result.score, col }; }
       alpha = Math.max(alpha, best.score);
-      if (alpha >= beta) { totalPruned++; break; }
+      if (alpha >= beta) {
+        totalPruned++;
+        if (childNode) childNode.cutoff = true;
+        break;
+      }
     }
+    if (captureNode) captureNode.score = best.score;
     return best;
   } else {
     let best = { score: Infinity, col: cols[0] };
     for (const col of cols) {
       const newBoard = board.map(r => [...r]);
       dropPiece(newBoard, col, 1);
-      const result = minimax(newBoard, depth-1, alpha, beta, true);
+      let childNode = null;
+      if (captureNode && captureNode._td < TREE_DISPLAY_DEPTH) {
+        childNode = { col, score: null, maximizing: true, cutoff: false, children: [], _td: captureNode._td + 1 };
+        captureNode.children.push(childNode);
+      }
+      const result = minimax(newBoard, depth - 1, alpha, beta, true, childNode);
       if (result.score < best.score) { best = { score: result.score, col }; }
       beta = Math.min(beta, best.score);
-      if (alpha >= beta) { totalPruned++; break; }
+      if (alpha >= beta) {
+        totalPruned++;
+        if (childNode) childNode.cutoff = true;
+        break;
+      }
     }
+    if (captureNode) captureNode.score = best.score;
     return best;
   }
+}
+
+function markBestPath(node) {
+  if (!node.children.length) return;
+  let best = node.children[0];
+  for (const c of node.children) {
+    if (c.score === null) continue;
+    if (node.maximizing ? c.score > best.score : c.score < best.score) best = c;
+  }
+  best.isBest = true;
+  markBestPath(best);
+}
+
+function renderTree() {
+  const container = document.getElementById('tree-svg-container');
+  if (!treeRoot || !treeRoot.children.length) return;
+
+  markBestPath(treeRoot);
+
+  const NODE_R = 15;
+  const LEVEL_H = 76;
+  const LEAF_GAP = 40;
+  const PAD_X = 20;
+  const PAD_Y = 20;
+
+  let leafIdx = 0;
+
+  function assignPos(node) {
+    node._y = node._td * LEVEL_H + PAD_Y + NODE_R;
+    if (!node.children.length) {
+      node._x = PAD_X + leafIdx * LEAF_GAP;
+      leafIdx++;
+    } else {
+      node.children.forEach(assignPos);
+      node._x = (node.children[0]._x + node.children[node.children.length - 1]._x) / 2;
+    }
+  }
+
+  assignPos(treeRoot);
+
+  const svgW = Math.max(PAD_X * 2 + leafIdx * LEAF_GAP, 320);
+  const svgH = TREE_DISPLAY_DEPTH * LEVEL_H + PAD_Y * 2 + NODE_R * 2;
+
+  function fmtScore(s) {
+    if (s === null) return '?';
+    if (s > 50000) return 'W';
+    if (s < -50000) return 'L';
+    return String(s);
+  }
+
+  let edges = '', nodes = '';
+
+  function traverse(node) {
+    node.children.forEach(child => {
+      const cx1 = node._x.toFixed(1), cy1 = node._y;
+      const cx2 = child._x.toFixed(1), cy2 = child._y;
+      const isBest = child.isBest;
+      edges += `<line x1="${cx1}" y1="${cy1}" x2="${cx2}" y2="${cy2}" `
+        + `stroke="${isBest ? '#00d4ff' : '#1e2a3a'}" `
+        + `stroke-width="${isBest ? 2 : 1.5}" `
+        + `opacity="${isBest ? 1 : 0.55}"/>`;
+      traverse(child);
+    });
+
+    const baseClr = node.maximizing ? '#f5e642' : '#ff6b35';
+    const fillClr = node.maximizing ? 'rgba(245,230,66,0.09)' : 'rgba(255,107,53,0.09)';
+    const rimClr  = node.isBest ? '#00d4ff' : node.cutoff ? '#ff4d6d' : baseClr;
+    const rimW    = node.isBest ? 2 : 1.5;
+    const scoreStr = fmtScore(node.score);
+    const nx = node._x.toFixed(1), ny = node._y;
+
+    nodes += `<circle cx="${nx}" cy="${ny}" r="${NODE_R}" fill="${fillClr}" stroke="${rimClr}" stroke-width="${rimW}"/>`;
+    nodes += `<text x="${nx}" y="${ny + 4}" text-anchor="middle" `
+      + `font-family="JetBrains Mono,monospace" font-size="8" fill="${rimClr}">${scoreStr}</text>`;
+    if (node.col !== null) {
+      nodes += `<text x="${nx}" y="${ny - NODE_R - 5}" text-anchor="middle" `
+        + `font-family="JetBrains Mono,monospace" font-size="8" fill="#4a6080">c${node.col}</text>`;
+    }
+  }
+
+  traverse(treeRoot);
+
+  // Depth labels on right side
+  const labelX = svgW - 4;
+  const levelNames = ['root', 'AI', 'human', 'AI'];
+  let labels = '';
+  for (let d = 0; d <= TREE_DISPLAY_DEPTH; d++) {
+    const ly = d * LEVEL_H + PAD_Y + NODE_R + 3;
+    labels += `<text x="${labelX}" y="${ly}" text-anchor="end" `
+      + `font-family="JetBrains Mono,monospace" font-size="8" fill="#253040">${levelNames[d]}</text>`;
+  }
+
+  container.innerHTML = `<svg width="${svgW}" height="${svgH}" style="display:block">${edges}${nodes}${labels}</svg>`;
 }
 
 async function humanMove(col) {
@@ -1032,9 +1211,12 @@ async function humanMove(col) {
   await new Promise(res => setTimeout(res, 10));
   const depth = parseInt(document.getElementById('ai-depth').value);
   totalNodes = 0; totalPruned = 0;
-  const result = minimax(c4Board, depth, -Infinity, Infinity, true);
+  treeRoot = { col: null, score: null, maximizing: true, cutoff: false, children: [], _td: 0 };
+  const result = minimax(c4Board, depth, -Infinity, Infinity, true, treeRoot);
+  treeRoot.score = result.score;
   document.getElementById('nodes-label').textContent  = `Nodes: ${totalNodes.toLocaleString()}`;
   document.getElementById('pruned-label').textContent = `Pruned: ${totalPruned.toLocaleString()}`;
+  renderTree();
 
   dropPiece(c4Board, result.col, 2);
   const win2 = checkWin(c4Board, 2);
