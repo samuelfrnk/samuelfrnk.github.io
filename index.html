@@ -201,6 +201,8 @@
 
   .hero-card.green .dot { background: var(--accent2); }
   .hero-card.green:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(0,255,136,0.04); }
+  .hero-card.orange .dot { background: var(--accent3); }
+  .hero-card.orange:hover { border-color: var(--accent3); color: var(--accent3); background: rgba(255,107,53,0.04); }
 
   /* SECTIONS */
   section {
@@ -537,6 +539,77 @@
     border-radius: 6px;
     min-height: 100px;
   }
+
+  /* PERCEPTRON */
+  .pcpt-layout {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  @media (max-width: 700px) {
+    .pcpt-layout { grid-template-columns: 1fr; }
+  }
+
+  #pcpt-canvas {
+    display: block;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    background: var(--bg2);
+    cursor: crosshair;
+    max-width: 100%;
+  }
+
+  .pcpt-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 220px;
+  }
+
+  .weight-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
+
+  .weight-bar-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    min-width: 24px;
+  }
+
+  .weight-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .weight-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.15s, background 0.15s;
+    position: absolute;
+  }
+
+  .weight-bar-val {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text);
+    min-width: 50px;
+    text-align: right;
+  }
+
+  #pcpt-network {
+    display: block;
+    margin: 0 auto;
+  }
 </style>
 </head>
 <body>
@@ -545,6 +618,7 @@
   <ul class="nav-links">
     <li><a href="#dijkstra">Dijkstra</a></li>
     <li><a href="#connect4">Connect 4</a></li>
+    <li><a href="#perceptron">Perceptron</a></li>
     <li><a href="https://github.com/samuelfrnk" target="_blank">GitHub</a></li>
   </ul>
 </nav>
@@ -552,10 +626,11 @@
 <div class="hero">
   <div class="grid-bg"></div>
   <h1>Algorithm<br><em>Visualization</em></h1>
-  <p class="hero-sub">Interactive visualizations of classical algorithms.<br>Click the maze to set start &amp; end. Play against a minimax AI.</p>
+  <p class="hero-sub">Interactive visualizations of classical algorithms.<br>Click the maze to set start &amp; end. Play against a minimax AI.<br>Watch a perceptron learn a decision boundary in real time.</p>
   <div class="hero-cards">
     <a class="hero-card" href="#dijkstra"><span class="dot"></span>Dijkstra's shortest path</a>
     <a class="hero-card green" href="#connect4"><span class="dot"></span>Minimax + alpha-beta</a>
+    <a class="hero-card orange" href="#perceptron"><span class="dot" style="background:var(--accent3)"></span>Perceptron learning</a>
   </div>
 </div>
 
@@ -656,6 +731,79 @@
   </div>
   <div class="tree-wrap" id="tree-wrap">
     <div id="tree-svg-container" style="padding:1.5rem; font-family:var(--font-mono); font-size:11px; color:var(--muted);">Make a move to see the game tree.</div>
+  </div>
+</section>
+
+<!-- ===== PERCEPTRON ===== -->
+<section id="perceptron">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2>Perceptron <em>Learning</em></h2>
+  </div>
+  <p class="section-desc">
+    The perceptron is the simplest neural network, a single neuron that learns a linear decision boundary.
+    Click to place points of two classes, then watch it train. The boundary rotates and shifts in real time as the weights update.
+  </p>
+  <div class="divider"></div>
+
+  <div class="controls">
+    <select id="pcpt-class">
+      <option value="1">Class A (cyan)</option>
+      <option value="-1">Class B (orange)</option>
+    </select>
+    <select id="pcpt-lr">
+      <option value="0.01">LR 0.01</option>
+      <option value="0.05" selected>LR 0.05</option>
+      <option value="0.1">LR 0.1</option>
+      <option value="0.5">LR 0.5</option>
+    </select>
+    <button class="primary" id="pcpt-train-btn" onclick="toggleTrain()">▶ Train</button>
+    <button onclick="addPreset()">⚙ Preset data</button>
+    <button class="danger" onclick="clearPerceptron()">✕ Clear</button>
+    <div class="status-bar" id="pcpt-status"><span>Ready</span> — click to place points</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#00d4ff"></div> Class A</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ff6b35"></div> Class B</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,255,136,0.5)"></div> Decision boundary</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,77,109,0.3)"></div> Misclassified</div>
+  </div>
+
+  <div class="pcpt-layout">
+    <div>
+      <canvas id="pcpt-canvas"></canvas>
+    </div>
+    <div class="pcpt-info">
+      <div class="info-card">
+        <h3>Network</h3>
+        <svg id="pcpt-network" width="200" height="160"></svg>
+      </div>
+      <div class="info-card">
+        <h3>Weights</h3>
+        <div class="weight-bar">
+          <span class="weight-bar-label">w1</span>
+          <div class="weight-bar-track"><div class="weight-bar-fill" id="wb-w1"></div></div>
+          <span class="weight-bar-val" id="wv-w1">0.00</span>
+        </div>
+        <div class="weight-bar">
+          <span class="weight-bar-label">w2</span>
+          <div class="weight-bar-track"><div class="weight-bar-fill" id="wb-w2"></div></div>
+          <span class="weight-bar-val" id="wv-w2">0.00</span>
+        </div>
+        <div class="weight-bar">
+          <span class="weight-bar-label">b</span>
+          <div class="weight-bar-track"><div class="weight-bar-fill" id="wb-bias"></div></div>
+          <span class="weight-bar-val" id="wv-bias">0.00</span>
+        </div>
+      </div>
+      <div class="info-card">
+        <h3>Training</h3>
+        <p>Epoch: <span class="highlight" id="pcpt-epoch">0</span></p>
+        <p>Errors: <span class="highlight3" id="pcpt-errors">0</span> / <span id="pcpt-total">0</span></p>
+        <p>Accuracy: <span class="highlight2" id="pcpt-acc">—</span></p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1272,10 +1420,372 @@ function updateC4Status() {
   }
 }
 
+/* =============================================
+   PERCEPTRON
+   ============================================= */
+const pcptCanvas = document.getElementById('pcpt-canvas');
+const pcptCtx = pcptCanvas.getContext('2d');
+const PCPT_SIZE = 480;
+pcptCanvas.width = PCPT_SIZE;
+pcptCanvas.height = PCPT_SIZE;
+
+let pcptPoints = [];       // {x, y, label: 1 or -1}
+let pcptW = [0, 0];        // weights
+let pcptBias = 0;
+let pcptEpoch = 0;
+let pcptTraining = false;
+let pcptAnimId = null;
+
+// Coordinate system: canvas [0, PCPT_SIZE] maps to [-1, 1]
+function toCanvas(x, y) {
+  return [(x + 1) / 2 * PCPT_SIZE, (1 - (y + 1) / 2) * PCPT_SIZE];
+}
+
+function fromCanvas(cx, cy) {
+  return [cx / PCPT_SIZE * 2 - 1, 1 - cy / PCPT_SIZE * 2];
+}
+
+function pcptPredict(x, y) {
+  return pcptW[0] * x + pcptW[1] * y + pcptBias >= 0 ? 1 : -1;
+}
+
+function drawPerceptron() {
+  const ctx = pcptCtx;
+  ctx.clearRect(0, 0, PCPT_SIZE, PCPT_SIZE);
+
+  // Draw decision regions (subtle background shading)
+  const regionRes = 8;
+  for (let px = 0; px < PCPT_SIZE; px += regionRes) {
+    for (let py = 0; py < PCPT_SIZE; py += regionRes) {
+      const [x, y] = fromCanvas(px + regionRes / 2, py + regionRes / 2);
+      const pred = pcptPredict(x, y);
+      ctx.fillStyle = pred === 1 ? 'rgba(0,212,255,0.03)' : 'rgba(255,107,53,0.03)';
+      ctx.fillRect(px, py, regionRes, regionRes);
+    }
+  }
+
+  // Grid
+  ctx.strokeStyle = '#1a2535';
+  ctx.lineWidth = 0.5;
+  // Axes
+  const [ox, oy] = toCanvas(0, 0);
+  ctx.strokeStyle = '#253040';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, PCPT_SIZE); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(PCPT_SIZE, oy); ctx.stroke();
+
+  // Tick marks
+  ctx.fillStyle = '#253040';
+  ctx.font = '9px JetBrains Mono';
+  ctx.textAlign = 'center';
+  for (let v = -0.8; v <= 0.8; v += 0.4) {
+    const [tx] = toCanvas(v, 0);
+    const [, ty] = toCanvas(0, v);
+    ctx.fillText(v.toFixed(1), tx, oy + 12);
+    ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(1), ox - 5, ty + 3);
+    ctx.textAlign = 'center';
+  }
+
+  // Decision boundary line: w1*x + w2*y + b = 0
+  const mag = Math.sqrt(pcptW[0] ** 2 + pcptW[1] ** 2);
+  if (mag > 0.0001) {
+    // Find two endpoints of the line within [-1,1]
+    const pts = [];
+    if (Math.abs(pcptW[1]) > 0.0001) {
+      // y = -(w1*x + b) / w2
+      for (const xv of [-1.2, 1.2]) {
+        const yv = -(pcptW[0] * xv + pcptBias) / pcptW[1];
+        pts.push([xv, yv]);
+      }
+    } else {
+      // x = -b / w1
+      const xv = -pcptBias / pcptW[0];
+      pts.push([xv, -1.2]);
+      pts.push([xv, 1.2]);
+    }
+    if (pts.length === 2) {
+      const [x1c, y1c] = toCanvas(pts[0][0], pts[0][1]);
+      const [x2c, y2c] = toCanvas(pts[1][0], pts[1][1]);
+      ctx.strokeStyle = 'rgba(0,255,136,0.5)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x1c, y1c);
+      ctx.lineTo(x2c, y2c);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Normal vector arrow from center of line
+      if (pcptPoints.length > 0) {
+        const nmag = mag;
+        const nx = pcptW[0] / nmag * 0.08;
+        const ny = pcptW[1] / nmag * 0.08;
+        const midX = -(pcptBias * pcptW[0]) / (mag * mag);
+        const midY = -(pcptBias * pcptW[1]) / (mag * mag);
+        const [amx, amy] = toCanvas(midX, midY);
+        const [aex, aey] = toCanvas(midX + nx, midY + ny);
+        ctx.strokeStyle = 'rgba(0,255,136,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(amx, amy);
+        ctx.lineTo(aex, aey);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Points
+  for (const pt of pcptPoints) {
+    const [cx, cy] = toCanvas(pt.x, pt.y);
+    const pred = pcptPredict(pt.x, pt.y);
+    const misclassified = pred !== pt.label;
+
+    // Misclassified ring
+    if (misclassified) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,77,109,0.2)';
+      ctx.fill();
+      ctx.strokeStyle = '#ff4d6d';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = pt.label === 1 ? '#00d4ff' : '#ff6b35';
+    ctx.fill();
+    ctx.strokeStyle = pt.label === 1 ? 'rgba(0,212,255,0.5)' : 'rgba(255,107,53,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function updateWeightBars() {
+  const maxW = 2;
+  const vals = [
+    { id: 'w1', val: pcptW[0] },
+    { id: 'w2', val: pcptW[1] },
+    { id: 'bias', val: pcptBias }
+  ];
+  for (const { id, val } of vals) {
+    const bar = document.getElementById('wb-' + id);
+    const label = document.getElementById('wv-' + id);
+    const pct = Math.min(Math.abs(val) / maxW, 1) * 50;
+    if (val >= 0) {
+      bar.style.left = '50%';
+      bar.style.width = pct + '%';
+      bar.style.background = '#00d4ff';
+    } else {
+      bar.style.left = (50 - pct) + '%';
+      bar.style.width = pct + '%';
+      bar.style.background = '#ff6b35';
+    }
+    label.textContent = val.toFixed(3);
+  }
+}
+
+function drawNetwork() {
+  const svg = document.getElementById('pcpt-network');
+  const w = 200, h = 160;
+
+  // Node positions
+  const inputs = [
+    { x: 30, y: 35, label: 'x1' },
+    { x: 30, y: 80, label: 'x2' },
+    { x: 30, y: 125, label: '1' }
+  ];
+  const output = { x: 170, y: 80, label: 'ŷ' };
+  const weights = [pcptW[0], pcptW[1], pcptBias];
+  const wLabels = ['w1', 'w2', 'b'];
+
+  let html = '';
+
+  // Edges
+  for (let i = 0; i < 3; i++) {
+    const inp = inputs[i];
+    const wVal = weights[i];
+    const thick = Math.min(Math.abs(wVal) * 3 + 0.5, 4);
+    const color = wVal >= 0 ? '#00d4ff' : '#ff6b35';
+    const opacity = Math.min(0.3 + Math.abs(wVal) * 0.5, 0.9);
+    html += `<line x1="${inp.x}" y1="${inp.y}" x2="${output.x}" y2="${output.y}"
+      stroke="${color}" stroke-width="${thick.toFixed(1)}" opacity="${opacity.toFixed(2)}"/>`;
+    // Weight label
+    const mx = (inp.x + output.x) / 2 - 5;
+    const my = (inp.y + output.y) / 2 - 5;
+    html += `<text x="${mx}" y="${my}" font-family="JetBrains Mono,monospace" font-size="7" fill="${color}">${wLabels[i]}=${wVal.toFixed(2)}</text>`;
+  }
+
+  // Input nodes
+  for (const inp of inputs) {
+    html += `<circle cx="${inp.x}" cy="${inp.y}" r="14" fill="rgba(0,212,255,0.06)" stroke="#00d4ff" stroke-width="1"/>`;
+    html += `<text x="${inp.x}" y="${inp.y + 3}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#00d4ff">${inp.label}</text>`;
+  }
+
+  // Output node
+  html += `<circle cx="${output.x}" cy="${output.y}" r="16" fill="rgba(0,255,136,0.06)" stroke="#00ff88" stroke-width="1.5"/>`;
+  html += `<text x="${output.x}" y="${output.y + 3}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#00ff88">${output.label}</text>`;
+
+  // Step function label
+  html += `<text x="${output.x}" y="${output.y + 28}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#4a6080">sign(Σ)</text>`;
+
+  svg.innerHTML = html;
+}
+
+function updateStats() {
+  let errors = 0;
+  for (const pt of pcptPoints) {
+    if (pcptPredict(pt.x, pt.y) !== pt.label) errors++;
+  }
+  document.getElementById('pcpt-epoch').textContent = pcptEpoch;
+  document.getElementById('pcpt-errors').textContent = errors;
+  document.getElementById('pcpt-total').textContent = pcptPoints.length;
+  document.getElementById('pcpt-acc').textContent = pcptPoints.length > 0
+    ? ((1 - errors / pcptPoints.length) * 100).toFixed(0) + '%' : '—';
+  return errors;
+}
+
+function trainOneEpoch() {
+  if (pcptPoints.length === 0) return 0;
+  const lr = parseFloat(document.getElementById('pcpt-lr').value);
+  let errors = 0;
+
+  // Shuffle
+  const indices = pcptPoints.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  for (const idx of indices) {
+    const pt = pcptPoints[idx];
+    const pred = pcptPredict(pt.x, pt.y);
+    if (pred !== pt.label) {
+      errors++;
+      pcptW[0] += lr * pt.label * pt.x;
+      pcptW[1] += lr * pt.label * pt.y;
+      pcptBias += lr * pt.label;
+    }
+  }
+  pcptEpoch++;
+  return errors;
+}
+
+function trainLoop() {
+  if (!pcptTraining) return;
+  const errors = trainOneEpoch();
+  drawPerceptron();
+  updateWeightBars();
+  drawNetwork();
+  updateStats();
+
+  const statusEl = document.getElementById('pcpt-status');
+  if (errors === 0 && pcptPoints.length > 0) {
+    statusEl.innerHTML = '<span>Converged!</span> — all points classified correctly';
+    statusEl.className = 'status-bar green';
+    stopTraining();
+    return;
+  }
+  statusEl.innerHTML = `<span>Training</span> — epoch ${pcptEpoch}, ${errors} error${errors !== 1 ? 's' : ''}`;
+  statusEl.className = 'status-bar';
+
+  pcptAnimId = setTimeout(trainLoop, 80);
+}
+
+function toggleTrain() {
+  if (pcptTraining) {
+    stopTraining();
+  } else {
+    if (pcptPoints.length < 2) {
+      const s = document.getElementById('pcpt-status');
+      s.innerHTML = '<span>Add points</span> — need at least 2';
+      s.className = 'status-bar warn';
+      return;
+    }
+    pcptTraining = true;
+    document.getElementById('pcpt-train-btn').textContent = '⏸ Pause';
+    document.getElementById('pcpt-train-btn').className = 'primary';
+    trainLoop();
+  }
+}
+
+function stopTraining() {
+  pcptTraining = false;
+  if (pcptAnimId) { clearTimeout(pcptAnimId); pcptAnimId = null; }
+  document.getElementById('pcpt-train-btn').textContent = '▶ Train';
+}
+
+function clearPerceptron() {
+  stopTraining();
+  pcptPoints = [];
+  pcptW = [0, 0];
+  pcptBias = 0;
+  pcptEpoch = 0;
+  drawPerceptron();
+  updateWeightBars();
+  drawNetwork();
+  updateStats();
+  const s = document.getElementById('pcpt-status');
+  s.innerHTML = '<span>Ready</span> — click to place points';
+  s.className = 'status-bar';
+}
+
+function addPreset() {
+  stopTraining();
+  pcptPoints = [];
+  pcptW = [0, 0];
+  pcptBias = 0;
+  pcptEpoch = 0;
+
+  // Generate two linearly separable clusters
+  for (let i = 0; i < 15; i++) {
+    pcptPoints.push({
+      x: -0.2 + (Math.random() - 0.5) * 0.8,
+      y:  0.3 + (Math.random() - 0.5) * 0.7,
+      label: 1
+    });
+    pcptPoints.push({
+      x:  0.2 + (Math.random() - 0.5) * 0.8,
+      y: -0.3 + (Math.random() - 0.5) * 0.7,
+      label: -1
+    });
+  }
+
+  drawPerceptron();
+  updateWeightBars();
+  drawNetwork();
+  updateStats();
+  const s = document.getElementById('pcpt-status');
+  s.innerHTML = '<span>Preset loaded</span> — press Train to start';
+  s.className = 'status-bar green';
+}
+
+// Canvas click to add points
+pcptCanvas.addEventListener('click', function(e) {
+  if (pcptTraining) return;
+  const rect = pcptCanvas.getBoundingClientRect();
+  const scaleX = pcptCanvas.width / rect.width;
+  const scaleY = pcptCanvas.height / rect.height;
+  const cx = (e.clientX - rect.left) * scaleX;
+  const cy = (e.clientY - rect.top) * scaleY;
+  const [x, y] = fromCanvas(cx, cy);
+
+  const label = parseInt(document.getElementById('pcpt-class').value);
+  pcptPoints.push({ x, y, label });
+  drawPerceptron();
+  updateStats();
+
+  const s = document.getElementById('pcpt-status');
+  s.innerHTML = `<span>${pcptPoints.length} points</span> — press Train when ready`;
+  s.className = 'status-bar';
+});
+
 // Init everything
 initGrid();
 drawMaze();
 resetC4();
+clearPerceptron();
 </script>
 </body>
 </html>
